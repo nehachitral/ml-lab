@@ -1,0 +1,54 @@
+#K MEANS CLUSTERING
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+
+# Step 1: Load the Iris dataset
+iris = load_iris()
+X = iris.data  # Features (sepal length, sepal width, etc.)
+
+# Step 2: Normalize the data (optional but helps in K-Means)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Step 3: Define the K-Means function (from scratch)
+def k_means(X, k, max_iters=100, tol=1e-4):
+    # Step 3a: Randomly initialize the centroids by picking random points from the data
+    np.random.seed(42)
+    centroids = X[np.random.choice(X.shape[0], k, replace=False)]
+
+    # Step 3b: Iteratively update the centroids
+    for _ in range(max_iters):
+        # Step 3c: Assign each point to the closest centroid
+        distances = np.linalg.norm(X[:, np.newaxis] - centroids, axis=2)
+        labels = np.argmin(distances, axis=1)
+
+        # Step 3d: Update the centroids (mean of points in each cluster)
+        new_centroids = np.array([X[labels == i].mean(axis=0) for i in range(k)])
+
+        # Step 3e: Check for convergence (if centroids don't change, stop)
+        if np.all(np.abs(new_centroids - centroids) < tol):
+            break
+
+        centroids = new_centroids
+
+    return centroids, labels
+
+# Step 4: Apply the K-Means algorithm
+k = 3  # As there are 3 species in Iris dataset
+centroids, labels = k_means(X_scaled, k)
+
+# Step 5: Visualizing the clusters (using the first two features for simplicity)
+plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=labels, cmap='viridis', marker='o')
+plt.scatter(centroids[:, 0], centroids[:, 1], c='red', s=200, marker='X', label='Centroids')
+plt.title('K-Means Clustering on Iris Dataset (from Scratch)')
+plt.xlabel('Sepal Length (scaled)')
+plt.ylabel('Sepal Width (scaled)')
+plt.legend()
+plt.show()
+
+# Output Cluster Centers
+print("Cluster Centers:\n", centroids)

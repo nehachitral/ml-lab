@@ -1,0 +1,74 @@
+#LAB 4
+#KNN
+import csv
+import random
+import math
+import matplotlib.pyplot as plt
+from collections import Counter
+
+# Load dataset
+def load_dataset(filename):
+    dataset = []
+    with open(filename, 'r') as file:
+        csv_reader = csv.reader(file)
+        next(csv_reader)  # skip header
+        for row in csv_reader:
+            features = list(map(float, row[:-1]))
+            label = row[-1]
+            dataset.append(features + [label])
+    return dataset
+
+# Train/test split
+def train_test_split(dataset, test_ratio=0.2):
+    random.shuffle(dataset)
+    split_index = int(len(dataset) * (1 - test_ratio))
+    return dataset[:split_index], dataset[split_index:]
+
+# Euclidean distance
+def euclidean_distance(p1, p2):
+    return math.sqrt(sum((p1[i] - p2[i]) ** 2 for i in range(len(p1) - 1)))
+
+# KNN predict
+def knn_predict(train_set, test_point, k=3):
+    distances = []
+    for train_point in train_set:
+        dist = euclidean_distance(test_point, train_point)
+        distances.append((train_point, dist))
+    distances.sort(key=lambda x: x[1])
+    k_labels = [pair[0][-1] for pair in distances[:k]]
+    return Counter(k_labels).most_common(1)[0][0]
+
+# Plot first 2 features
+def plot_points(train_set, predict_point, predicted_class, k):
+    colors = ['red', 'blue', 'green', 'purple', 'orange']
+    label_color = {}
+    current_color = 0
+
+    for point in train_set:
+        label = point[-1]
+        if label not in label_color:
+            label_color[label] = colors[current_color % len(colors)]
+            current_color += 1
+        plt.scatter(point[0], point[1], color=label_color[label], marker='o')
+
+    # Plot the predicted point
+    plt.scatter(predict_point[0], predict_point[1], color='black', marker='x', s=100, label=f'Predicted: {predicted_class}')
+
+    plt.title(f'KNN Prediction (k={k})')
+    plt.xlabel('Sepal Length (cm)')
+    plt.ylabel('Sepal Width (cm)')
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+# MAIN
+filename = "/content/Iris.csv"  # Replace with your path
+dataset = load_dataset(filename)
+train_set, _ = train_test_split(dataset, test_ratio=0.2)
+
+k = 3
+predict_point = [6.7, 3, 5, 1.7, None]  # The point to classify
+predicted_class = knn_predict(train_set, predict_point, k)
+
+print(f"✅ Predicted Class for [6.7,3,5,1.7]: {predicted_class}")
+plot_points(train_set, predict_point, predicted_class, k)

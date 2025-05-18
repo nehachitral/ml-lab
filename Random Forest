@@ -1,0 +1,162 @@
+#LAB 6
+#Random Forest
+import pandas as pd
+import numpy as np
+import random
+from collections import Counter
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# === Load dataset ===
+file_path = "/content/Titanic-Dataset.csv"  # Change this for another dataset
+df = pd.read_csv(file_path)
+
+# === General preprocessing ===
+target_col = 'Survived'  # Set this to your target column
+
+# Drop rows with missing target
+df = df.dropna(subset=[target_col])
+
+# Encode categoricals
+for col in df.select_dtypes(include='object').columns:
+    df[col] = pd.factorize(df[col])[0]
+
+# Fill missing numerical columns
+for col in df.select_dtypes(include=['float64', 'int64']).columns:
+    df[col] = df[col].fillna(df[col].median())
+
+# Split features and labels
+X = df.drop(columns=[target_col]).values.tolist()
+y = df[target_col].tolist()
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# === Random Forest implementation ===
+def most_common_label(y): return Counter(y).most_common(1)[0][0]
+
+def gini(y):
+    counter = Counter(y)
+    return 1 - sum((c / len(y)) ** 2 for c in counter.values())
+
+def information_gain(parent, left, right):
+    n = len(parent)
+    return gini(parent) - len(left)/n * gini(left) - len(right)/n * gini(right)
+
+def split(X, y, feature_idx, threshold):
+    left_X, left_y, right_X, right_y = [], [], [], []
+    for xi, yi in zip(X, y):
+        if xi[feature_idx] < threshold:
+            left_X.append(xi); left_y.append(yi)
+        else:
+            right_X.append(xi); right_y.append(yi)
+    return left_X, left_y, right_X, right_y
+
+class DecisionTree:
+    def __init__(self, max_depth=10, min_samples_split=2, n_features=None):
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.n_features = n_features
+        self.tree = None
+
+    def fit(self, X, y, depth=0):
+        n_samples, n_features_total = len(X), len(X[0])
+        self.n_features = self.n_features or int(np.sqrt(n_features_total))
+
+        if depth >= self.max_depth or len(set(y)) == 1 or len(X) < self.min_samples_split:
+            return most_common_label(y)
+
+        feat_idxs = random.sample(range(n_features_total), self.n_features)
+        best_gain, best_split = -1, None
+
+        for feat in feat_idxs:
+            thresholds = set([xi[feat] for xi in X])
+            for threshold in thresholds:
+                lX, ly, rX, ry = split(X, y, feat, threshold)
+                if not ly or not ry: continue
+                gain = information_gain(y, ly, ry)
+                if gain > best_gain:
+                    best_gain = gain
+                    best_split = (feat, threshold, lX, ly, rX, ry)
+
+        if best_gain == -1:
+            return most_common_label(y)
+
+        feat, threshold, lX, ly, rX, ry = best_split
+        left = self.fit(lX, ly, depth + 1)
+        right = self.fit(rX, ry, depth + 1)
+        return (feat, threshold, left, right)
+
+    def predict_one(self, x, tree):
+        if not isinstance(tree, tuple):
+            return tree
+        feat, threshold, left, right = tree
+        return self.predict_one(x, left) if x[feat] < threshold else self.predict_one(x, right)
+
+    def predict(self, X):
+        return [self.predict_one(x, self.tree) for x in X]
+
+class RandomForest:
+    def __init__(self, n_trees=10, max_depth=10, min_samples_split=2):
+        self.n_trees = n_trees
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.trees = []
+
+    def bootstrap_sample(self, X, y):
+        n = len(X)
+        indices = [random.randint(0, n - 1) for _ in range(n)]
+        return [X[i] for i in indices], [y[i] for i in indices]
+
+    def fit(self, X, y):
+        self.trees = []
+        for _ in range(self.n_trees):
+            tree = DecisionTree(max_depth=self.max_depth, min_samples_split=self.min_samples_split)
+            X_sample, y_sample = self.bootstrap_sample(X, y)
+            tree.tree = tree.fit(X_sample, y_sample)
+            self.trees.append(tree)
+
+    def predict(self, X):
+        tree_preds = np.array([tree.predict(X) for tree in self.trees])
+        return [most_common_label(preds) for preds in tree_preds.T]
+
+# === Training and Evaluation ===
+rf = RandomForest(n_trees=10, max_depth=10)
+rf.fit(X_train, y_train)
+y_pred = rf.predict(X_test)
+
+accuracy = sum(p == t for p, t in zip(y_pred, y_test)) / len(y_test)
+print(f"\nAccuracy: {accuracy:.2f}")
+
+# === Manual classification report ===
+def classification_report_manual(y_true, y_pred):
+    tp = sum((yt == 1 and yp == 1) for yt, yp in zip(y_true, y_pred))
+    tn = sum((yt == 0 and yp == 0) for yt, yp in zip(y_true, y_pred))
+    fp = sum((yt == 0 and yp == 1) for yt, yp in zip(y_true, y_pred))
+    fn = sum((yt == 1 and yp == 0) for yt, yp in zip(y_true, y_pred))
+
+    precision = tp / (tp + fp + 1e-10)
+    recall = tp / (tp + fn + 1e-10)
+    f1 = 2 * precision * recall / (precision + recall + 1e-10)
+
+    print("\nClassification Report (manual):")
+    print(f"Precision: {precision:.2f}")
+    print(f"Recall:    {recall:.2f}")
+    print(f"F1 Score:  {f1:.2f}")
+
+classification_report_manual(y_test, y_pred)
+
+# === Confusion matrix visualization ===
+def plot_confusion_matrix(y_true, y_pred):
+    cm = pd.crosstab(pd.Series(y_true, name='Actual'), pd.Series(y_pred, name='Predicted'))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title("Confusion Matrix")
+    plt.show()
+
+plot_confusion_matrix(y_test, y_pred)
+
+# === Sample Prediction ===
+sample = X_test[0]
+prediction = rf.predict([sample])[0]
+print(f"\nSample Features: {sample}")
+print(f"Predicted Class: {prediction}")

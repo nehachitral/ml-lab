@@ -1,0 +1,47 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset (update the file path if necessary)
+df = pd.read_csv("/experience_salary.csv")  # Ensure the correct file path
+
+# User-defined column selection
+feature_col = df.columns[0]  # First column as feature (X)
+target_col = df.columns[1]   # Second column as target (Y)
+
+# Extract features (X) and target (Y)
+X = df[feature_col].values
+Y = df[target_col].values
+
+# Compute means
+mean_X = np.mean(X)
+mean_Y = np.mean(Y)
+mean_XY = np.mean(X * Y)
+mean_X2 = np.mean(X ** 2)
+
+# Compute slope (b1) using the mean-based formula
+b1 = (mean_XY - mean_X * mean_Y) / (mean_X2 - mean_X**2)
+
+# Compute intercept (b0)
+b0 = mean_Y - b1 * mean_X
+
+# Print values of b0 and b1
+print(f"Intercept (b0): {b0:.4f}")
+print(f"Slope (b1): {b1:.4f}")
+
+# Print the regression equation
+print(f"Linear Regression Equation: {target_col} = {b0:.2f} + {b1:.2f} * {feature_col}")
+
+# Plot the data points
+plt.scatter(X, Y, color="blue", marker="o", s=30, label="Actual Data")
+
+# Plot the regression line
+plt.plot(X, b0 + b1 * X, color="red", label="Regression Line (Mean-Based)")
+
+# Labels and title
+plt.xlabel(feature_col)
+plt.ylabel(target_col)
+plt.title("Linear Regression using Mean-Based Formula")
+plt.legend()
+plt.grid(True)
+plt.show()

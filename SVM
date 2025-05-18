@@ -1,0 +1,82 @@
+#LAB 4
+#SVM
+import csv
+import random
+import matplotlib.pyplot as plt
+
+# Load dataset
+def load_dataset(filename):
+    dataset = []
+    with open(filename, 'r') as file:
+        csv_reader = csv.reader(file)
+        next(csv_reader)  # skip header
+        for row in csv_reader:
+            features = list(map(float, row[1:-1]))  # Assuming format: ID, f1, f2, f3, f4, label
+            label = 1 if row[-1] == 'Iris-setosa' else -1  # Binary classification
+            dataset.append(features[:2] + [label])  # Only use first 2 features for plotting
+    return dataset
+
+# Split into training and test
+def train_test_split(data, test_ratio=0.2):
+    random.shuffle(data)
+    split_index = int(len(data) * (1 - test_ratio))
+    return data[:split_index], data[split_index:]
+
+# SVM Training using SGD
+def train_svm(train_set, learning_rate=0.01, lambda_param=0.01, epochs=1000):
+    w = [0, 0]
+    b = 0
+
+    for epoch in range(epochs):
+        for features in train_set:
+            x = features[:2]
+            y = features[2]
+
+            condition = y * (dot_product(w, x) + b) >= 1
+            if condition:
+                w = [w[i] - learning_rate * (2 * lambda_param * w[i]) for i in range(len(w))]
+            else:
+                w = [w[i] - learning_rate * (2 * lambda_param * w[i] - y * x[i]) for i in range(len(w))]
+                b = b + learning_rate * y
+    return w, b
+
+def dot_product(a, b):
+    return sum([a[i] * b[i] for i in range(len(a))])
+
+# Prediction
+def predict(x, w, b):
+    return 1 if dot_product(w, x) + b >= 0 else -1
+
+# Plotting
+def plot_svm(train_set, w, b):
+    for point in train_set:
+        x1, x2, label = point
+        color = 'blue' if label == 1 else 'red'
+        plt.scatter(x1, x2, c=color)
+
+    # Decision boundary
+    x_vals = [min(p[0] for p in train_set), max(p[0] for p in train_set)]
+    y_vals = [(-w[0] * x - b) / w[1] for x in x_vals]
+    plt.plot(x_vals, y_vals, '--k', label='Decision Boundary')
+
+    plt.xlabel("Sepal Length")
+    plt.ylabel("Sepal Width")
+    plt.title("Linear SVM Classifier")
+    plt.grid(True)
+    plt.legend()
+    plt.show()
+
+# MAIN
+filename = "/content/Iris.csv"  # Replace with your actual file path
+dataset = load_dataset(filename)
+train_set, test_set = train_test_split(dataset)
+
+w, b = train_svm(train_set)
+plot_svm(train_set, w, b)
+
+# Testing
+for point in test_set:
+    x = point[:2]
+    actual = point[2]
+    pred = predict(x, w, b)
+    print(f"Actual: {actual:<2}  Predicted: {pred}")

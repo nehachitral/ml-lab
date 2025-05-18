@@ -1,0 +1,38 @@
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+def logistic_regression(file_path, target_column, lr=0.01, epochs=1000):
+    df = pd.read_csv(file_path)
+    y = df[target_column].values.reshape(-1, 1)
+    X = df.drop(columns=[target_column]).values
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # Add intercept
+    X_train = np.c_[np.ones((X_train.shape[0], 1)), X_train]
+    X_test = np.c_[np.ones((X_test.shape[0], 1)), X_test]
+
+    theta = np.zeros((X_train.shape[1], 1))
+
+    for i in range(epochs):
+        z = X_train @ theta
+        h = sigmoid(z)
+        gradient = X_train.T @ (h - y_train) / y_train.size
+        theta -= lr * gradient
+
+    preds = sigmoid(X_test @ theta) >= 0.5
+    accuracy = np.mean(preds == y_test)
+
+    print("\n=== Logistic Regression ===")
+    print("Weights (including intercept):", theta.flatten())
+    print("Accuracy on test set:", accuracy)
+
+
+if __name__ == "__main__":
+    file_path = input("Enter path to CSV file: ").strip()
+    target_column = input("Enter the target column name: ").strip()
+    logistic_regression(file_path, target_column)

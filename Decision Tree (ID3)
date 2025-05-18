@@ -1,0 +1,64 @@
+#LAB 3
+import numpy as np
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn.preprocessing import LabelEncoder
+from IPython.display import Image
+import pydotplus
+from six import StringIO
+
+file_path = "/content/weather_forecast.csv"
+df = pd.read_csv(file_path)
+
+if "Id" in df.columns:
+    df = df.drop(columns=["Id"])
+
+label_encoders = {}
+for column in df.columns:
+    if df[column].dtype == 'object':
+        le = LabelEncoder()
+        df[column] = le.fit_transform(df[column])
+        label_encoders[column] = le
+
+def entropy(y):
+    values, counts = np.unique(y, return_counts=True)
+    probabilities = counts / counts.sum()
+    return -np.sum(probabilities * np.log2(probabilities))
+
+def information_gain(data, feature, target):
+    total_entropy = entropy(data[target])
+    values, counts = np.unique(data[feature], return_counts=True)
+    weighted_entropy = sum((counts[i] / sum(counts)) * entropy(data[data[feature] == values[i]][target]) for i in range(len(values)))
+    return total_entropy - weighted_entropy
+
+def find_best_split(data, target):
+    features = data.columns[:-1]
+    info_gains = {feature: information_gain(data, feature, target) for feature in features}
+    return max(info_gains, key=info_gains.get)
+
+target_column = df.columns[-1]
+entropy_values = {feature: entropy(df[feature]) for feature in df.columns[:-1]}
+info_gains = {feature: information_gain(df, feature, target_column) for feature in df.columns[:-1]}
+root_node = find_best_split(df, target_column)
+
+print("\nEntropy for each feature:")
+for feature, ent in entropy_values.items():
+    print(f"{feature}: {ent:.4f}")
+
+print("\nInformation Gain for each feature:")
+for feature, gain in info_gains.items():
+    print(f"{feature}: {gain:.4f}")
+
+print(f"\nRoot Node (Best Split): {root_node}")
+
+X = df.drop(columns=[target_column])
+y = df[target_column]
+
+clf = DecisionTreeClassifier(criterion="entropy", max_depth=3, random_state=42)
+clf.fit(X, y)
+
+dot_data = StringIO()
+export_graphviz(clf, out_file=dot_data, filled=True, feature_names=X.columns, class_names=[str(cls) for cls in np.unique(y)])
+graph = pydotplus.graph_from_dot_data(dot_data.getvalue())
+
+Image(graph.create_png())
